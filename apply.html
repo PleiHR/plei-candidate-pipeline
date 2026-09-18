@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Apply · Plei</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap narrow">
+    <nav class="nav">
+      <span class="logo"><span style="color:var(--green)">plei</span><span class="dot">.</span></span>
+      <span class="spacer"></span>
+      <span class="badge">We're hiring</span>
+    </nav>
+
+    <h1>Apply to <span class="g" style="color:var(--green)">Plei</span></h1>
+    <p class="sub" id="introText">Tell us about yourself. Your answers go straight and privately to our HR team.</p>
+
+    <div id="okMsg" class="callout" style="display:none">Thanks — your application is in! We'll be in touch.</div>
+
+    <form id="applyForm">
+      <label class="lbl">Full name *</label>
+      <input id="fName" required />
+      <label class="lbl">Email *</label>
+      <input id="fEmail" type="email" required />
+      <label class="lbl">Phone *</label>
+      <input id="fPhone" required />
+      <label class="lbl">Location *</label>
+      <input id="fLocation" required placeholder="City, country" />
+      <label class="lbl">LinkedIn *</label>
+      <input id="fLinkedin" required placeholder="https://linkedin.com/in/…" />
+      <label class="lbl">Job role *</label>
+      <select id="fRole" required></select>
+      <label class="lbl">Did someone refer you? (optional)</label>
+      <input id="fReferral" placeholder="Their name" />
+      <label class="lbl">Résumé link *</label>
+      <input id="fResume" required placeholder="Google Drive / Dropbox / portfolio link" />
+      <label class="lbl">Salary expectations *</label>
+      <input id="fSalary" required />
+
+      <button class="btn" type="submit" style="margin-top:20px;width:100%">Submit application</button>
+      <p class="err" id="formErr"></p>
+    </form>
+
+    <footer>Plei, Inc.</footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db-supabase.js"></script>
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  var params = new URLSearchParams(location.search);
+  var preselectRole = params.get("role");
+
+  async function loadRoles() {
+    var roles = await window.PLEI_DB.listOpenRoles();
+    var opts = roles.map(function (r) { return r.title; });
+    if (preselectRole && opts.indexOf(preselectRole) === -1) opts.unshift(preselectRole);
+    opts.push("Other / not listed");
+    $("fRole").innerHTML = opts
+      .map(function (t) { return '<option value="' + t.replace(/"/g, "&quot;") + '"' + (t === preselectRole ? " selected" : "") + ">" + t + "</option>"; })
+      .join("");
+    if (preselectRole) $("introText").textContent = "Applying for " + preselectRole + ". Your answers go straight and privately to our HR team.";
+  }
+  loadRoles();
+
+  $("applyForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    $("formErr").textContent = "";
+    var candidate = {
+      name: $("fName").value.trim(),
+      email: $("fEmail").value.trim(),
+      phone: $("fPhone").value.trim(),
+      location: $("fLocation").value.trim(),
+      linkedin: $("fLinkedin").value.trim(),
+      role_title: $("fRole").value,
+      referral: $("fReferral").value.trim() || null,
+      resume_url: $("fResume").value.trim(),
+      salary: $("fSalary").value.trim(),
+      status: "new",
+      priority: "normal",
+    };
+    try {
+      await window.PLEI_DB.insertCandidate(candidate);
+      $("applyForm").style.display = "none";
+      $("okMsg").style.display = "block";
+    } catch (err) {
+      $("formErr").textContent = "Something went wrong submitting your application. Please try again in a moment.";
+      console.error(err);
+    }
+  });
+})();
+</script>
+</body>
+</html>

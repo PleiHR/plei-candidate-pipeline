@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Candidate Pipeline · Plei</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="loginScreen" style="display:none">
+  <div class="wrap narrow">
+    <div class="loginbox">
+      <h1>Candidate <span class="g" style="color:var(--green)">Pipeline</span></h1>
+      <p class="sub" style="margin-bottom:18px">Staff sign-in. Ask Priscila for an account if you don't have one yet.</p>
+      <form id="loginForm">
+        <label class="lbl">Email</label>
+        <input id="loginEmail" type="email" required autocomplete="username" />
+        <label class="lbl">Password</label>
+        <input id="loginPassword" type="password" required autocomplete="current-password" />
+        <button class="btn" type="submit" style="margin-top:18px;width:100%">Sign in</button>
+        <p class="err" id="loginErr"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="appScreen" style="display:none">
+  <div class="wrap">
+    <nav class="nav">
+      <span class="logo"><span style="color:var(--green)">plei</span><span class="dot">.</span></span>
+      <span class="link active">Candidate Pipeline</span>
+      <a class="link" href="apply.html" target="_blank">Public apply page ↗</a>
+      <span class="spacer"></span>
+      <span class="badge" id="whoami"></span>
+      <button class="linklike" id="signOutBtn">Sign out</button>
+    </nav>
+
+    <h1>Candidate <span class="g" style="color:var(--green)">Pipeline</span></h1>
+    <p class="sub">Every candidate, one shared board — real-time, for everyone signed in. Grouped by job role as applicants come in, with a general view of the whole hiring process.</p>
+
+    <div id="roleTabs" class="roletabs"></div>
+    <p id="roleHint" class="rolehint"></p>
+
+    <div id="stats" class="stats"></div>
+
+    <div style="display:flex;gap:10px;margin-bottom:20px">
+      <input id="addName" placeholder="Add a candidate by name…" style="flex:1" />
+      <button class="btn" id="addBtn" type="button">+ Add</button>
+    </div>
+
+    <div id="board" class="board"></div>
+
+    <footer>Plei, Inc. — internal tool.</footer>
+  </div>
+</div>
+
+<div class="modal" id="candidateModal">
+  <div class="sheet">
+    <button class="x" id="cmClose" type="button" aria-label="Close">×</button>
+    <h2 id="cmTitle">Candidate</h2>
+    <p class="m">Changes save automatically.</p>
+
+    <div class="fieldrow">
+      <div><label class="lbl">Name</label><input id="cmName" /></div>
+      <div><label class="lbl">Job role</label><select id="cmRole"></select></div>
+    </div>
+    <div class="fieldrow">
+      <div><label class="lbl">Email</label><input id="cmEmail" type="email" /></div>
+      <div><label class="lbl">Phone</label><input id="cmPhone" /></div>
+    </div>
+    <div class="fieldrow">
+      <div><label class="lbl">Location</label><input id="cmLocation" /></div>
+      <div><label class="lbl">LinkedIn</label><input id="cmLinkedin" /></div>
+    </div>
+    <div class="fieldrow">
+      <div><label class="lbl">Referral</label><input id="cmReferral" /></div>
+      <div><label class="lbl">Salary expectations</label><input id="cmSalary" /></div>
+    </div>
+    <label class="lbl">Résumé link</label>
+    <input id="cmResume" placeholder="https://…" />
+
+    <div class="fieldrow">
+      <div><label class="lbl">Stage</label><select id="cmStatus"></select></div>
+      <div><label class="lbl">Priority</label>
+        <select id="cmPriority">
+          <option value="urgent">Urgent</option><option value="high">High</option>
+          <option value="normal" selected>Normal</option><option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+    <div class="fieldrow">
+      <div><label class="lbl">Due date</label><input id="cmDue" type="date" /></div>
+      <div><label class="lbl">Assignee</label><input id="cmAssignee" placeholder="Who's on this" /></div>
+    </div>
+
+    <label class="lbl">Barrier 1 notes</label><textarea id="cmB1" rows="2"></textarea>
+    <label class="lbl">Barrier 2 notes</label><textarea id="cmB2" rows="2"></textarea>
+    <label class="lbl">Barrier 3 notes</label><textarea id="cmB3" rows="2"></textarea>
+
+    <label class="lbl">Comments</label>
+    <div id="commentList" class="commentlist"></div>
+    <form id="commentForm" style="display:flex;gap:8px">
+      <input id="commentBody" placeholder="Add a comment…" style="flex:1" />
+      <button class="btn ghost" type="submit">Post</button>
+    </form>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:20px">
+      <button class="btn danger" id="cmDelete" type="button">Remove candidate</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="stages.js"></script>
+<script src="db-supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
