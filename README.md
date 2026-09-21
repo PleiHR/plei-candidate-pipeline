@@ -27,51 +27,70 @@ the site and sign in.
 ### 1. Create a free Supabase project
 
 1. Go to [supabase.com](https://supabase.com) and sign up (free — no credit
-   card required for the free tier).
+card required for the free tier).
 2. Click **New project**. Pick any name (e.g. "plei-hiring"), set a database
-   password (save it somewhere safe — you likely won't need it again), and
-   choose the region closest to your team.
+password (save it somewhere safe — you likely won't need it again), and
+choose the region closest to your team.
 3. Wait a minute or two for the project to finish setting up.
 
 ### 2. Set up the database
 
 1. In your new Supabase project, open the **SQL Editor** (left sidebar).
 2. Open the file `supabase/schema.sql` from this repository, copy its
-   entire contents, and paste it into the SQL Editor.
+entire contents, and paste it into the SQL Editor.
 3. Click **Run**. This creates the three tables the app needs (`roles`,
-   `candidates`, `comments`), sets up the privacy rules described below, and
-   seeds three example open roles you can edit or delete afterward from the
-   app itself.
+`candidates`, `comments`), sets up the privacy rules described below, and
+seeds three example open roles you can edit or delete afterward from the
+app itself.
 
-### 3. Create staff accounts
+### 3. Enable Google Workspace sign-in
 
-Each HR staff member who needs to sign in gets their own account:
+Staff sign in with **Continue with Google**, restricted to `@plei.com`
+accounts — no separate password to create or hand out. This needs a Google
+OAuth client and, once you have it, one toggle in Supabase:
 
-1. In Supabase, go to **Authentication → Users**.
-2. Click **Add user → Create new user**.
-3. Enter their email and a temporary password, and make sure **Auto Confirm
-   User** is checked (so they don't need to click an email link).
-4. Share that email/password with them — they can sign in with it right
-   away, and there's no in-app way to change a password yet, so if someone
-   needs a new one, reset it from this same Supabase screen.
+1. In [Google Cloud Console](https://console.cloud.google.com), create (or
+reuse) a project, then go to **APIs & Services → Credentials → Create
+credentials → OAuth client ID**, application type **Web application**.
+2. Under **Authorized redirect URIs**, add your Supabase project's callback
+URL: `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback` (find
+`YOUR-PROJECT-REF` in step 4 below, or in the Supabase dashboard's URL).
+3. Save, then copy the **Client ID** and **Client secret**.
+4. In Supabase, go to **Authentication → Providers → Google**, toggle it
+on, and paste in the Client ID and secret. Save.
 
-Repeat for everyone on HR who needs access. There's no separate "admin"
-role — anyone signed in has full access to every candidate, the same as
-everyone did with the old shared board.
+That's the only account HR staff need — there's no separate "admin" role,
+anyone who signs in with a `@plei.com` account has full access to every
+candidate, the same as everyone did with the old shared board. The domain
+restriction is enforced twice: Google's account picker is hinted to only
+show `@plei.com` accounts (`window.PLEI_WORKSPACE_DOMAIN` in `config.js`),
+and — this is the part that actually can't be bypassed — the database
+itself rejects any request from a signed-in user whose email isn't
+`@plei.com` (see `is_staff_domain()` in `supabase/schema.sql`, step 2
+above). Change the domain in **both** places if it's ever renamed.
+
+**Fallback:** the login screen still has a "Sign in with email instead"
+option using Supabase's plain email/password auth, for the rare case Google
+sign-in isn't available. To add someone that way: Supabase →
+**Authentication → Users → Add user → Create new user**, with **Auto
+Confirm User** checked, and share the temporary password with them
+directly (there's no in-app way to change it yet — reset it from this same
+screen if needed). An email/password account still needs a `@plei.com`
+address to pass the same database check.
 
 ### 4. Connect the app to your project
 
 1. In Supabase, go to **Project Settings → API**.
 2. Copy the **Project URL** and the **anon public** key (not the
-   `service_role` key — that one must never be shared or put in this app).
+`service_role` key — that one must never be shared or put in this app).
 3. Open `config.js` in this repository and replace the placeholder values:
 
-   ```js
-   window.SUPABASE_CONFIG = {
-     url: "https://your-project-id.supabase.co",
-     anonKey: "your-anon-public-key",
-   };
-   ```
+```js
+window.SUPABASE_CONFIG = {
+url: "https://your-project-id.supabase.co",
+anonKey: "your-anon-public-key",
+};
+```
 
 4. Commit that change (see "Publishing changes" below).
 
@@ -79,28 +98,28 @@ everyone did with the old shared board.
 
 1. In this repository on GitHub, go to **Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to "Deploy from a branch",
-   branch `main`, folder `/ (root)`, then **Save**.
+branch `main`, folder `/ (root)`, then **Save**.
 3. GitHub will give you a URL like
-   `https://pleihr.github.io/plei-candidate-pipeline/` — that's the staff
-   board. Add `/apply.html` to the end of it for the public application
-   page (e.g. to link from job postings or `careers.html`).
+`https://pleihr.github.io/plei-candidate-pipeline/` — that's the staff
+board. Add `/apply.html` to the end of it for the public application
+page (e.g. to link from job postings or `careers.html`).
 
 That's it — the app is live.
 
 ## Using the app day-to-day
 
-- **Staff board** (`index.html`, the root URL): sign in with the email/
-  password Supabase set up for you. You'll see the same 13-stage board,
-  role tabs, and stats as the old `hiring-pipeline.html`, except every
-  change is shared with everyone else signed in, live.
+- **Staff board** (`index.html`, the root URL): sign in with **Continue with
+Google** using your `@plei.com` account. You'll see the same 13-stage
+board, role tabs, and stats as the old `hiring-pipeline.html`, except
+every change is shared with everyone else signed in, live.
 - **Public apply page** (`apply.html`): anyone with the link can fill it
-  out, no account needed. Submissions always start at the "New Application"
-  stage and only staff who are signed in can see them — an applicant can
-  never read back other applicants' data (see "How privacy works" below).
+out, no account needed. Submissions always start at the "New Application"
+stage and only staff who are signed in can see them — an applicant can
+never read back other applicants' data (see "How privacy works" below).
 - Roles are managed the same way as before: from the "Job role" dropdown in
-  a candidate's detail view, or by adding rows directly in Supabase's
-  **Table Editor → roles** if you want a dedicated roles-admin screen later
-  (not built yet — see "Possible follow-ups").
+a candidate's detail view, or by adding rows directly in Supabase's
+**Table Editor → roles** if you want a dedicated roles-admin screen later
+(not built yet — see "Possible follow-ups").
 
 ## Publishing changes
 
@@ -115,10 +134,11 @@ The database rules (set up by `supabase/schema.sql`) are what keeps
 applicant data private:
 
 - Anyone, signed in or not, can **submit** a new application (insert a
-  candidate row) and can only ever see which roles are marked "open" — never
-  read the candidate list, comments, or closed/internal roles.
-- Only a signed-in staff account (created in Supabase, step 3 above) can
-  **read or edit** candidates, comments, and the full roles list.
+candidate row) and can only ever see which roles are marked "open" — never
+read the candidate list, comments, or closed/internal roles.
+- Only a signed-in staff account with a `@plei.com` email (step 3 above)
+can **read or edit** candidates, comments, and the full roles list —
+enforced by `is_staff_domain()` in the database, not just the app's UI.
 
 This is enforced by the database itself, not just by the app's UI, so it
 holds even if someone inspects the page's network traffic directly.
@@ -136,11 +156,11 @@ and are safe to leave in the deployed site.
 ## Possible follow-ups (not built, flagged for later)
 
 - Linking `careers.html`'s "Apply now" buttons on the Plei Home Base site
-  to this app's `apply.html` instead of the old per-browser apply form —
-  would need a `?role=` query param to preselect the role, which
-  `apply.html` here already supports.
+to this app's `apply.html` instead of the old per-browser apply form —
+would need a `?role=` query param to preselect the role, which
+`apply.html` here already supports.
 - A dedicated in-app screen for adding/editing/closing open roles (today
-  that's either through a candidate's role dropdown or directly in
-  Supabase's Table Editor).
+that's either through a candidate's role dropdown or directly in
+Supabase's Table Editor).
 - Password reset / "forgot password" from inside the app itself, rather
-  than a staff member asking you to reset it from the Supabase dashboard.
+than a staff member asking you to reset it from the Supabase dashboard.
