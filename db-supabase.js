@@ -21,6 +21,24 @@
       if (r.error) throw r.error;
       return r.data.session;
     },
+    async signInWithGoogle() {
+      // `hd` (hosted domain) hints Google's account chooser to only show
+      // accounts on our Workspace domain. It's a UI convenience, not a
+      // security boundary: someone could still reach the OAuth screen with a
+      // different account, which is why app.js double-checks the signed-in
+      // email client-side and, more importantly, the RLS policies in
+      // supabase/schema.sql reject non-domain emails at the database itself.
+      var domain = window.PLEI_WORKSPACE_DOMAIN || "";
+      var r = await client.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin + window.location.pathname,
+          queryParams: domain ? { hd: domain } : {},
+        },
+      });
+      if (r.error) throw r.error;
+      return r.data;
+    },
     async signOut() {
       await client.auth.signOut();
     },
