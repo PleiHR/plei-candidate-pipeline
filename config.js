@@ -4,8 +4,8 @@
 // what actually protects the data is the Row Level Security policies in
 // supabase/schema.sql, not secrecy of this key.
 window.SUPABASE_CONFIG = {
-  url: "https://YOUR-PROJECT-REF.supabase.co",
-  anonKey: "YOUR-ANON-PUBLIC-KEY",
+  url: "https://ewrdyxafmvrunuratymp.supabase.co",
+  anonKey: "sb_publishable_zJ9lWeDOpern0QZsosCnng_3XG771TL",
 };
 
 // Google Workspace domain allowed to sign in to the staff board. Used both
