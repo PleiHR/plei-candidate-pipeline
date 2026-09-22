@@ -1,6 +1,6 @@
 (function () {
 var db = null; // set once PLEI_DB exists
-var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null };
+var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false };
 
 function esc(s) {
 return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -19,6 +19,7 @@ function showApp() {
 $("loginScreen").style.display = "none";
 $("appScreen").style.display = "block";
 $("whoami").textContent = (state.session && state.session.user && state.session.user.email) || "";
+$("teamAccessBtn").style.display = state.isAdmin ? "" : "none";
 }
 
 // Client-side half of the domain restriction: kicks out any session whose
@@ -38,26 +39,52 @@ async function boot() {
 db = window.PLEI_DB;
 var suppressNextClear = false; // true while a signOut we triggered ourselves is in flight
 
-function checkDomain(session) {
+// Two gates a signed-in session has to clear before it sees the board:
+// 1. the domain check above (client-side convenience, same as before).
+// 2. being individually added to staff_members by an admin (see
+// supabase/schema.sql and the "Team access" screen below) — this is what
+// lets us restrict access to specific people instead of everyone on the
+// @plei.com domain. Both are re-checked server-side by RLS regardless.
+async function checkAccess(session) {
 if (!session) return true;
-if (isAllowedEmail(session.user && session.user.email)) return true;
+if (!isAllowedEmail(session.user && session.user.email)) {
 suppressNextClear = true;
 showLogin("Only @" + window.PLEI_WORKSPACE_DOMAIN + " accounts can sign in.");
 db.signOut();
 return false;
 }
+if (!(await db.isAuthorizedStaff())) {
+suppressNextClear = true;
+showLogin("Your account isn't authorized yet. Ask a Plei admin to add you under Team access.");
+db.signOut();
+return false;
+}
+return true;
+}
 
-db.onAuthChange(function (session) {
+db.onAuthChange(async function (session) {
 if (!session && suppressNextClear) { suppressNextClear = false; return; }
-if (!checkDomain(session)) return;
+if (!(await checkAccess(session))) return;
 state.session = session;
-if (session) { showApp(); loadAll(); } else { showLogin(); }
+if (session) {
+state.isAdmin = await db.isAdmin();
+showApp();
+loadAll();
+} else {
+showLogin();
+}
 });
 var session = await db.getSession();
-if (checkDomain(session)) {
+if (await checkAccess(session)) {
 state.session = session;
-if (session) { showApp(); await loadAll(); db.subscribeToChanges(function () { loadAll(); }); }
-else { showLogin(); }
+if (session) {
+state.isAdmin = await db.isAdmin();
+showApp();
+await loadAll();
+db.subscribeToChanges(function () { loadAll(); });
+} else {
+showLogin();
+}
 }
 
 $("loginForm").addEventListener("submit", async function (e) {
@@ -256,6 +283,43 @@ return '<div class="comment"><span class="ca">' + esc(cm.author) + '</span><span
 .join("") || '<p class="colempty">No comments yet.</p>';
 }
 
+// ---------------------------------------------------------------- team access (admin only) --
+function myEmail() {
+return ((state.session && state.session.user && state.session.user.email) || "").toLowerCase();
+}
+
+async function openTeamAccess() {
+$("taEmail").value = "";
+$("taRole").value = "staff";
+$("taErr").textContent = "";
+await refreshStaffList();
+$("teamAccessModal").classList.add("show");
+}
+function closeTeamAccess() {
+$("teamAccessModal").classList.remove("show");
+}
+
+async function refreshStaffList() {
+var staff = await db.listStaff();
+var me = myEmail();
+$("staffList").innerHTML =
+staff
+.map(function (s) {
+var isMe = s.email.toLowerCase() === me;
+return (
+'<div class="staffrow">' +
+'<span class="se">' + esc(s.email) + (isMe ? " <span class=\"m\">(you)</span>" : "") + "</span>" +
+'<select class="taRoleSelect" data-email="' + esc(s.email) + '">' +
+'<option value="staff"' + (s.role === "staff" ? " selected" : "") + ">Staff</option>" +
+'<option value="admin"' + (s.role === "admin" ? " selected" : "") + ">Admin</option>" +
+"</select>" +
+'<button class="linklike" data-remove="' + esc(s.email) + '" style="color:#f6a9a2">Remove</button>' +
+"</div>"
+);
+})
+.join("") || '<p class="colempty">Nobody added yet.</p>';
+}
+
 // ---------------------------------------------------------------- add candidate --
 async function quickAdd() {
 var name = $("addName").value.trim();
@@ -320,6 +384,45 @@ var author = (state.session && state.session.user && state.session.user.email) |
 await db.addComment(state.openCandidateId, author, body);
 $("commentBody").value = "";
 await refreshComments(state.openCandidateId);
+});
+
+$("teamAccessBtn").addEventListener("click", openTeamAccess);
+$("taClose").onclick = closeTeamAccess;
+$("teamAccessModal").addEventListener("click", function (e) { if (e.target.id === "teamAccessModal") closeTeamAccess(); });
+$("teamAccessForm").addEventListener("submit", async function (e) {
+e.preventDefault();
+var email = $("taEmail").value.trim().toLowerCase();
+var role = $("taRole").value;
+if (!email) return;
+$("taErr").textContent = "";
+try {
+await db.addStaff(email, role, myEmail());
+$("taEmail").value = "";
+await refreshStaffList();
+} catch (err) {
+$("taErr").textContent = err.message || "Could not add that person.";
+}
+});
+$("staffList").addEventListener("click", async function (e) {
+var btn = e.target.closest("button[data-remove]");
+if (!btn) return;
+var email = btn.getAttribute("data-remove");
+if (email.toLowerCase() === myEmail()) { alert("You can't remove your own access."); return; }
+if (!confirm("Remove " + email + "'s access to the pipeline?")) return;
+await db.removeStaff(email);
+await refreshStaffList();
+});
+$("staffList").addEventListener("change", async function (e) {
+var sel = e.target.closest("select.taRoleSelect");
+if (!sel) return;
+var email = sel.getAttribute("data-email");
+if (email.toLowerCase() === myEmail() && sel.value !== "admin") {
+alert("You can't remove your own admin access.");
+await refreshStaffList();
+return;
+}
+await db.setStaffRole(email, sel.value);
+await refreshStaffList();
 });
 }
 
