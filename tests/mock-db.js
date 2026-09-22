@@ -16,7 +16,16 @@ var comments = [];
 var authListeners = [];
 var session = null; // start signed out, so the test can exercise the login gate
 
+// Mirrors staff_members in supabase/schema.sql. The mock Google sign-in
+// below always lands on this address, seeded here as an admin so the local
+// test suite can exercise the "Team access" screen too.
+var staffMembers = [
+{ email: "staff@" + (window.PLEI_WORKSPACE_DOMAIN || "plei.com"), role: "admin", added_by: "mock seed", created_at: nowIso() },
+];
+
 function fireAuth() { authListeners.forEach(function (cb) { cb(session); }); }
+function currentEmail() { return ((session && session.user && session.user.email) || "").toLowerCase(); }
+function staffRow(email) { return staffMembers.filter(function (s) { return s.email.toLowerCase() === email.toLowerCase(); })[0]; }
 
 window.PLEI_DB = {
 async signIn(email, password) {
@@ -35,6 +44,23 @@ return session;
 async signOut() { session = null; fireAuth(); },
 async getSession() { return session; },
 onAuthChange(cb) { authListeners.push(cb); },
+
+async isAuthorizedStaff() { return !!staffRow(currentEmail()); },
+async isAdmin() { var s = staffRow(currentEmail()); return !!(s && s.role === "admin"); },
+async listStaff() { return staffMembers.slice(); },
+async addStaff(email, role, addedBy) {
+var row = { email: email.trim().toLowerCase(), role: role, added_by: addedBy || null, created_at: nowIso() };
+staffMembers.push(row);
+return [row];
+},
+async setStaffRole(email, role) {
+var s = staffRow(email);
+if (s) s.role = role;
+return s ? [s] : [];
+},
+async removeStaff(email) {
+staffMembers = staffMembers.filter(function (s) { return s.email.toLowerCase() !== email.toLowerCase(); });
+},
 
 async listRoles() { return roles.slice(); },
 async listOpenRoles() { return roles.filter(function (r) { return r.status === "open"; }); },
