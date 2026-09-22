@@ -42,6 +42,7 @@ Continue with Google
 <a class="link" href="apply.html" target="_blank">Public apply page ↗</a>
 <span class="spacer"></span>
 <span class="badge" id="whoami"></span>
+<button class="linklike" id="teamAccessBtn" type="button" style="display:none">Team access</button>
 <button class="linklike" id="signOutBtn">Sign out</button>
 </nav>
 
@@ -117,6 +118,26 @@ Continue with Google
 <div style="display:flex;justify-content:flex-end;margin-top:20px">
 <button class="btn danger" id="cmDelete" type="button">Remove candidate</button>
 </div>
+</div>
+</div>
+
+<div class="modal" id="teamAccessModal">
+<div class="sheet">
+<button class="x" id="taClose" type="button" aria-label="Close">×</button>
+<h2>Team access</h2>
+<p class="m">Only people listed here can sign in and see this board — being a @plei.com Google account is no longer enough by itself. Admins can add or remove anyone, including other admins.</p>
+
+<form id="teamAccessForm" style="display:flex;gap:8px;margin:16px 0 6px">
+<input id="taEmail" type="email" placeholder="name@plei.com" style="flex:1" required />
+<select id="taRole" style="width:auto">
+<option value="staff">Staff</option>
+<option value="admin">Admin</option>
+</select>
+<button class="btn" type="submit">+ Add</button>
+</form>
+<p class="err" id="taErr"></p>
+
+<div id="staffList" style="margin-top:10px"></div>
 </div>
 </div>
 
