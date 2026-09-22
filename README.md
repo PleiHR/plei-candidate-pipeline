@@ -59,15 +59,15 @@ URL: `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback` (find
 4. In Supabase, go to **Authentication → Providers → Google**, toggle it
 on, and paste in the Client ID and secret. Save.
 
-That's the only account HR staff need — there's no separate "admin" role,
-anyone who signs in with a `@plei.com` account has full access to every
-candidate, the same as everyone did with the old shared board. The domain
-restriction is enforced twice: Google's account picker is hinted to only
-show `@plei.com` accounts (`window.PLEI_WORKSPACE_DOMAIN` in `config.js`),
-and — this is the part that actually can't be bypassed — the database
-itself rejects any request from a signed-in user whose email isn't
-`@plei.com` (see `is_staff_domain()` in `supabase/schema.sql`, step 2
-above). Change the domain in **both** places if it's ever renamed.
+Being a `@plei.com` account isn't enough by itself to get in — see "Managing
+who has access" below for the allow-list that actually decides who can sign
+in. The domain restriction on top of that is enforced twice: Google's
+account picker is hinted to only show `@plei.com` accounts
+(`window.PLEI_WORKSPACE_DOMAIN` in `config.js`), and — this is the part that
+actually can't be bypassed — the database itself rejects any request from a
+signed-in user whose email isn't `@plei.com` (see `is_staff_domain()` in
+`supabase/schema.sql`, step 2 above). Change the domain in **both** places
+if it's ever renamed.
 
 **Fallback:** the login screen still has a "Sign in with email instead"
 option using Supabase's plain email/password auth, for the rare case Google
@@ -106,6 +106,38 @@ page (e.g. to link from job postings or `careers.html`).
 
 That's it — the app is live.
 
+## Managing who has access (Team access)
+
+Being on the `@plei.com` Google Workspace isn't enough by itself to sign in
+— each person also has to be added individually by an admin. This is
+enforced by the database (`staff_members` in `supabase/schema.sql`), not
+just the app's UI, so it holds even if someone reaches the Google sign-in
+screen with a valid `@plei.com` account that hasn't been added.
+
+- Running `supabase/schema.sql` (step 2 above) seeds **priscila@plei.com**
+as the first admin. If that's not the right address, edit the last few
+lines of that file before running it, or just add the right person from
+the app afterward and remove the placeholder row from Supabase's **Table
+Editor → staff_members**.
+- Once signed in as an admin, click **Team access** in the top navigation
+to see everyone who currently has access. From there you can add a new
+person by email (as **Staff** or **Admin**), change anyone's role, or
+remove someone's access entirely — all of it live, no database work
+needed.
+- **Staff** and **Admin** see the exact same candidate board — the only
+difference is that admins can also open Team access and manage who's on
+the list. There's no limit on how many admins there can be.
+- Someone who signs in with a `@plei.com` account that isn't on the list
+sees "Your account isn't authorized yet. Ask a Plei admin to add you
+under Team access." and is signed back out — ask an existing admin to add
+their email from the Team access screen, then have them sign in again.
+
+If you're updating an existing deployment from before this feature
+existed: re-run the (updated) `supabase/schema.sql` in the SQL Editor — it's
+safe to re-run and will only add the new `staff_members` table, the access
+checks, and the one seed row, without touching your existing candidates or
+roles.
+
 ## Using the app day-to-day
 
 - **Staff board** (`index.html`, the root URL): sign in with **Continue with
@@ -136,9 +168,12 @@ applicant data private:
 - Anyone, signed in or not, can **submit** a new application (insert a
 candidate row) and can only ever see which roles are marked "open" — never
 read the candidate list, comments, or closed/internal roles.
-- Only a signed-in staff account with a `@plei.com` email (step 3 above)
-can **read or edit** candidates, comments, and the full roles list —
-enforced by `is_staff_domain()` in the database, not just the app's UI.
+- Only a signed-in account with a `@plei.com` email **and** an entry in
+`staff_members` (see "Managing who has access" above) can **read or
+edit** candidates, comments, and the full roles list — enforced by
+`is_authorized_staff()` in the database, not just the app's UI.
+- Only admins (`role = 'admin'` in `staff_members`) can read or change the
+`staff_members` table itself — enforced by `is_staff_admin()`.
 
 This is enforced by the database itself, not just by the app's UI, so it
 holds even if someone inspects the page's network traffic directly.
