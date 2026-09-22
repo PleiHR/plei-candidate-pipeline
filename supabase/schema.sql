@@ -68,6 +68,24 @@ created_at timestamptz not null default now()
 
 create index if not exists comments_candidate_idx on comments(candidate_id);
 
+-- ---------------------------------------------------------------------------
+-- staff_members: the allow-list of individual people permitted to sign in as
+-- staff, on top of the @plei.com domain check. Being a Workspace account is
+-- no longer enough by itself — an admin must also add the person's email
+-- here. `role` distinguishes admins (who can manage this list, from the
+-- "Team access" screen in the app) from regular staff (same board access as
+-- everyone else — viewing/editing candidates — just no ability to add or
+-- remove people).
+-- ---------------------------------------------------------------------------
+create table if not exists staff_members (
+  email text primary key,
+  role text not null default 'staff' check (role in ('admin', 'staff')),
+  added_by text,
+  created_at timestamptz not null default now()
+);
+
+alter table staff_members enable row level security;
+
 -- keep updated_at current on every edit
 create or replace function set_updated_at()
 returns trigger language plpgsql as $$
@@ -114,6 +132,35 @@ returns boolean language sql stable as $$
 select coalesce((auth.jwt() ->> 'email') ilike '%@plei.com', false);
 $$;
 
+-- The real access-control check used everywhere below: on the Workspace
+-- domain AND explicitly added to staff_members by an admin. Being a
+-- @plei.com account is necessary but no longer sufficient — this replaces
+-- is_staff_domain() as the gate on roles/candidates/comments.
+-- security definer: lets this read staff_members regardless of the caller's
+-- own RLS on that table (otherwise a non-admin's lookup here would itself be
+-- blocked by the staff_members policy below, and nobody could ever pass).
+create or replace function is_authorized_staff()
+returns boolean language sql stable security definer set search_path = public as $$
+select is_staff_domain() and exists (
+select 1 from staff_members
+where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+);
+$$;
+
+-- Is the signed-in user an admin, i.e. can they manage the staff_members
+-- list themselves from the "Team access" screen?
+create or replace function is_staff_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+select exists (
+select 1 from staff_members
+where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+and role = 'admin'
+);
+$$;
+
+grant execute on function is_authorized_staff() to authenticated, anon;
+grant execute on function is_staff_admin() to authenticated, anon;
+
 -- roles: anyone can see OPEN roles (needed for the public apply form's
 -- dropdown); only logged-in staff on the Workspace domain can see/add/edit/
 -- close roles.
@@ -127,8 +174,8 @@ drop policy if exists roles_staff_all on roles;
 create policy roles_staff_all
 on roles for all
 to authenticated
-using (is_staff_domain())
-with check (is_staff_domain());
+using (is_authorized_staff())
+with check (is_authorized_staff());
 
 -- candidates: the public can only ever INSERT (submit an application) and
 -- can never select/update/delete — that's what keeps applicant data private.
@@ -142,8 +189,8 @@ drop policy if exists candidates_staff_all on candidates;
 create policy candidates_staff_all
 on candidates for all
 to authenticated
-using (is_staff_domain())
-with check (is_staff_domain());
+using (is_authorized_staff())
+with check (is_authorized_staff());
 
 -- comments: staff-only, both directions. The public apply page never
 -- touches this table at all.
@@ -151,8 +198,19 @@ drop policy if exists comments_staff_all on comments;
 create policy comments_staff_all
 on comments for all
 to authenticated
-using (is_staff_domain())
-with check (is_staff_domain());
+using (is_authorized_staff())
+with check (is_authorized_staff());
+
+-- staff_members: only admins can see or change the allow-list itself.
+-- Regular staff never need to query this table directly — the app only
+-- shows the "Team access" screen to admins (client-side), and this is the
+-- real, server-side version of that same restriction.
+drop policy if exists staff_members_admin_all on staff_members;
+create policy staff_members_admin_all
+on staff_members for all
+to authenticated
+using (is_staff_admin())
+with check (is_staff_admin());
 
 -- ---------------------------------------------------------------------------
 -- Realtime: turn on change broadcasts so two staff members editing the same
@@ -193,3 +251,13 @@ insert into roles (title, team, location, type, status) values
 ('HR Operations Manager', 'Operations', 'Miami (hybrid)', 'Full-time', 'open'),
 ('Booking Agent', 'Magic', 'LatAm (remote)', 'Intl contractor', 'open')
 on conflict (title) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Seed the first admin, so the "Team access" screen isn't locked to nobody
+-- on day one. Safe to re-run (on conflict do nothing). Add or remove
+-- everyone else from the "Team access" screen in the app itself, not by
+-- editing this file — this line only ever needs to run once.
+-- ---------------------------------------------------------------------------
+insert into staff_members (email, role, added_by) values
+('priscila@plei.com', 'admin', 'schema seed')
+on conflict (email) do nothing;
