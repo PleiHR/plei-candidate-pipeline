@@ -242,6 +242,8 @@ $("cmAssignee").value = c.assignee || "";
 $("cmB1").value = c.barrier1_notes || "";
 $("cmB2").value = c.barrier2_notes || "";
 $("cmB3").value = c.barrier3_notes || "";
+var filledBarriers = [c.barrier1_notes, c.barrier2_notes, c.barrier3_notes].filter(Boolean).length;
+$("accBarriersCount").textContent = filledBarriers ? " (" + filledBarriers + "/3)" : "";
 await refreshComments(id);
 $("candidateModal").classList.add("show");
 }
@@ -281,6 +283,7 @@ $("commentList").innerHTML = state.comments
 return '<div class="comment"><span class="ca">' + esc(cm.author) + '</span><span class="ct">' + new Date(cm.created_at).toLocaleString() + "</span><div>" + esc(cm.body) + "</div></div>";
 })
 .join("") || '<p class="colempty">No comments yet.</p>';
+$("accCommentsCount").textContent = state.comments.length ? " (" + state.comments.length + ")" : "";
 }
 
 // ---------------------------------------------------------------- team access (admin only) --
@@ -363,7 +366,13 @@ $("candidateModal").addEventListener("click", function (e) { if (e.target.id ===
 ["cmLinkedin", "linkedin"], ["cmReferral", "referral"], ["cmSalary", "salary"], ["cmResume", "resume_url"],
 ["cmDue", "due_date"], ["cmAssignee", "assignee"], ["cmB1", "barrier1_notes"], ["cmB2", "barrier2_notes"], ["cmB3", "barrier3_notes"],
 ].forEach(function (pair) {
-$(pair[0]).addEventListener("input", function (e) { saveField(pair[1], e.target.value); });
+$(pair[0]).addEventListener("input", function (e) {
+saveField(pair[1], e.target.value);
+if (pair[0] === "cmB1" || pair[0] === "cmB2" || pair[0] === "cmB3") {
+var n = [$("cmB1").value, $("cmB2").value, $("cmB3").value].filter(Boolean).length;
+$("accBarriersCount").textContent = n ? " (" + n + "/3)" : "";
+}
+});
 });
 ["cmRole", "cmStatus", "cmPriority"].forEach(function (id) {
 var field = id === "cmRole" ? "role_title" : id === "cmStatus" ? "status" : "priority";
