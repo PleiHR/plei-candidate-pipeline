@@ -39,7 +39,7 @@ Continue with Google
 <nav class="nav">
 <span class="logo"><span style="color:var(--green)">plei</span><span class="dot">.</span></span>
 <span class="link active">Candidate Pipeline</span>
-<a class="link" href="apply.html" target="_blank">Public apply page ↗</a>
+<a class="link" href="apply.html" target="_blank">Public apply page ↓</a>
 <span class="spacer"></span>
 <span class="badge" id="whoami"></span>
 <button class="linklike" id="teamAccessBtn" type="button" style="display:none">Team access</button>
@@ -76,21 +76,6 @@ Continue with Google
 <div><label class="lbl">Job role</label><select id="cmRole"></select></div>
 </div>
 <div class="fieldrow">
-<div><label class="lbl">Email</label><input id="cmEmail" type="email" /></div>
-<div><label class="lbl">Phone</label><input id="cmPhone" /></div>
-</div>
-<div class="fieldrow">
-<div><label class="lbl">Location</label><input id="cmLocation" /></div>
-<div><label class="lbl">LinkedIn</label><input id="cmLinkedin" /></div>
-</div>
-<div class="fieldrow">
-<div><label class="lbl">Referral</label><input id="cmReferral" /></div>
-<div><label class="lbl">Salary expectations</label><input id="cmSalary" /></div>
-</div>
-<label class="lbl">Résumé link</label>
-<input id="cmResume" placeholder="https://…" />
-
-<div class="fieldrow">
 <div><label class="lbl">Stage</label><select id="cmStatus"></select></div>
 <div><label class="lbl">Priority</label>
 <select id="cmPriority">
@@ -99,21 +84,56 @@ Continue with Google
 </select>
 </div>
 </div>
+
+<details class="acc">
+<summary><span>Contact info</span></summary>
+<div class="accbody">
+<div class="fieldrow">
+<div><label class="lbl">Email</label><input id="cmEmail" type="email" /></div>
+<div><label class="lbl">Phone</label><input id="cmPhone" /></div>
+</div>
+<div class="fieldrow">
+<div><label class="lbl">Location</label><input id="cmLocation" /></div>
+<div><label class="lbl">LinkedIn</label><input id="cmLinkedin" /></div>
+</div>
+</div>
+</details>
+
+<details class="acc">
+<summary><span>Application details</span></summary>
+<div class="accbody">
+<div class="fieldrow">
+<div><label class="lbl">Referral</label><input id="cmReferral" /></div>
+<div><label class="lbl">Salary expectations</label><input id="cmSalary" /></div>
+</div>
+<label class="lbl">Résumé link</label>
+<input id="cmResume" placeholder="https://…" />
 <div class="fieldrow">
 <div><label class="lbl">Due date</label><input id="cmDue" type="date" /></div>
 <div><label class="lbl">Assignee</label><input id="cmAssignee" placeholder="Who's on this" /></div>
 </div>
+</div>
+</details>
 
+<details class="acc">
+<summary><span>Barrier notes<span id="accBarriersCount" class="accbadge"></span></span></summary>
+<div class="accbody">
 <label class="lbl">Barrier 1 notes</label><textarea id="cmB1" rows="2"></textarea>
 <label class="lbl">Barrier 2 notes</label><textarea id="cmB2" rows="2"></textarea>
 <label class="lbl">Barrier 3 notes</label><textarea id="cmB3" rows="2"></textarea>
+</div>
+</details>
 
-<label class="lbl">Comments</label>
+<details class="acc">
+<summary><span>Comments<span id="accCommentsCount" class="accbadge"></span></span></summary>
+<div class="accbody">
 <div id="commentList" class="commentlist"></div>
 <form id="commentForm" style="display:flex;gap:8px">
 <input id="commentBody" placeholder="Add a comment…" style="flex:1" />
 <button class="btn ghost" type="submit">Post</button>
 </form>
+</div>
+</details>
 
 <div style="display:flex;justify-content:flex-end;margin-top:20px">
 <button class="btn danger" id="cmDelete" type="button">Remove candidate</button>
