@@ -90,6 +90,17 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:rgba(47,215,11
 .sheet h2{margin:0 30px 4px 0;font-size:19px}
 .sheet .m{font-size:12.5px;color:var(--muted);margin:0 0 8px}
 .fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* collapsible sections inside the candidate modal */
+.acc{border:1px solid var(--line);border-radius:12px;margin:14px 0;overflow:hidden;background:rgba(255,255,255,.015)}
+.acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green-soft);user-select:none}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary::after{content:"▸";display:inline-block;transition:transform .15s;color:var(--muted);font-size:12px}
+.acc[open] summary::after{transform:rotate(90deg)}
+.acc summary:hover{background:rgba(47,215,113,.06)}
+.acc .accbody{padding:2px 14px 16px}
+.acc .accbody label.lbl:first-child{margin-top:2px}
+.accbadge{text-transform:none;font-weight:600;color:var(--muted);margin-left:6px;letter-spacing:0}
 .commentlist{max-height:220px;overflow:auto;margin:8px 0;display:flex;flex-direction:column;gap:8px}
 .comment{background:rgba(255,255,255,.025);border-radius:9px;padding:8px 10px;font-size:13px}
 .comment .ca{font-weight:600;color:var(--green-soft);font-size:12px}
