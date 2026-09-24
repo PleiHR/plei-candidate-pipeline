@@ -1,6 +1,7 @@
 (function () {
 var db = null; // set once PLEI_DB exists
-var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false };
+var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false, expandedCols: {} };
+var COL_PAGE_SIZE = 6; // candidates shown per column before "Show more"
 
 function esc(s) {
 return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -184,11 +185,8 @@ var stagesInRow = window.STAGES.filter(function (s) { return s.cat === row.cat; 
 var colsHtml = stagesInRow
 .map(function (s) {
 var cards = byStatus[s.key] || [];
-var cardsHtml = cards.length
-? cards.map(cardHtml).join("")
-: '<p class="colempty">No candidates</p>';
 return (
-'<div class="col"><div class="colhead"><span>' + esc(s.label) + '</span><span class="colcount">' + cards.length + "</span></div>" + cardsHtml + "</div>"
+'<div class="col"><div class="colhead"><span>' + esc(s.label) + '</span><span class="colcount">' + cards.length + "</span></div>" + colBodyHtml(cards, "stage:" + s.key) + "</div>"
 );
 })
 .join("");
@@ -202,10 +200,28 @@ var rejectedHtml =
 '<div class="boardrow"><h4><span class="dot closed"></span>Rejected</h4><div class="cols"><div class="col"><div class="colhead"><span>Rejected</span><span class="colcount">' +
 rejected.length +
 '</span></div>' +
-(rejected.length ? rejected.map(cardHtml).join("") : '<p class="colempty">No candidates</p>') +
+colBodyHtml(rejected, "rejected") +
 "</div></div></div>";
 
 $("board").innerHTML = rowsHtml + rejectedHtml;
+}
+
+// Renders a column's candidate list, capped at COL_PAGE_SIZE with a
+// "Show more" / "Show less" toggle so a busy stage doesn't dump hundreds
+// of cards on screen at once. Expanded state persists per column (keyed
+// by colKey) across re-renders until the user collapses it again.
+function colBodyHtml(cards, colKey) {
+if (!cards.length) return '<p class="colempty">No candidates</p>';
+var expanded = !!state.expandedCols[colKey];
+var visible = expanded ? cards : cards.slice(0, COL_PAGE_SIZE);
+var html = visible.map(cardHtml).join("");
+var remaining = cards.length - visible.length;
+if (remaining > 0) {
+html += '<button class="colmore" type="button" data-colmore="' + esc(colKey) + '">Show ' + remaining + " more ▾</button>";
+} else if (expanded && cards.length > COL_PAGE_SIZE) {
+html += '<button class="colmore" type="button" data-colless="' + esc(colKey) + '">Show less ▴</button>';
+}
+return html;
 }
 
 function cardHtml(c) {
@@ -352,6 +368,10 @@ state.activeRole = btn.getAttribute("data-role") || null;
 render();
 });
 $("board").addEventListener("click", function (e) {
+var more = e.target.closest("[data-colmore]");
+if (more) { state.expandedCols[more.getAttribute("data-colmore")] = true; renderBoard(); return; }
+var less = e.target.closest("[data-colless]");
+if (less) { delete state.expandedCols[less.getAttribute("data-colless")]; renderBoard(); return; }
 var card = e.target.closest(".ccard");
 if (!card) return;
 openCandidate(card.getAttribute("data-id"));
