@@ -1,6 +1,6 @@
 (function () {
 var db = null; // set once PLEI_DB exists
-var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false, expandedCols: {} };
+var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false, openRows: {}, openCols: {}, colShowAll: {} };
 var COL_PAGE_SIZE = 6; // candidates shown per column before "Show more"
 
 function esc(s) {
@@ -182,28 +182,46 @@ list.forEach(function (c) { (byStatus[c.status] = byStatus[c.status] || []).push
 
 var rowsHtml = window.STAGE_ROWS.map(function (row) {
 var stagesInRow = window.STAGES.filter(function (s) { return s.cat === row.cat; });
+var rowTotal = stagesInRow.reduce(function (sum, s) { return sum + (byStatus[s.key] || []).length; }, 0);
 var colsHtml = stagesInRow
 .map(function (s) {
 var cards = byStatus[s.key] || [];
-return (
-'<div class="col"><div class="colhead"><span>' + esc(s.label) + '</span><span class="colcount">' + cards.length + "</span></div>" + colBodyHtml(cards, "stage:" + s.key) + "</div>"
-);
+return colHtml(s.label, cards, "stage:" + s.key);
 })
 .join("");
-return (
-'<div class="boardrow"><h4><span class="dot ' + row.cat + '"></span>' + esc(row.title) + '</h4><div class="cols">' + colsHtml + "</div></div>"
-);
+return rowHtml(row.title, row.cat, rowTotal, colsHtml);
 }).join("");
 
 var rejected = byStatus["rejected"] || [];
-var rejectedHtml =
-'<div class="boardrow"><h4><span class="dot closed"></span>Rejected</h4><div class="cols"><div class="col"><div class="colhead"><span>Rejected</span><span class="colcount">' +
-rejected.length +
-'</span></div>' +
-colBodyHtml(rejected, "rejected") +
-"</div></div></div>";
+var rejectedHtml = rowHtml("Rejected", "closed", rejected.length, colHtml("Rejected", rejected, "rejected"));
 
 $("board").innerHTML = rowsHtml + rejectedHtml;
+}
+
+// Renders one top-level accordion row (Not started / Active — the Barriers /
+// Done / Rejected). Collapsed by default; open/closed state persists per
+// row (keyed by rowKey) across re-renders until the user toggles it again.
+function rowHtml(title, rowKey, count, innerColsHtml) {
+var open = !!state.openRows[rowKey];
+return (
+'<details class="boardrow"' + (open ? " open" : "") + ' data-rowkey="' + esc(rowKey) + '">' +
+'<summary class="boardrowhead"><span class="rowtitle"><span class="dot ' + esc(rowKey) + '"></span>' + esc(title) + '</span>' +
+'<span class="rowheadright"><span class="rowcount">' + count + (count === 1 ? " candidate" : " candidates") + '</span><span class="rowarrow">▸</span></span></summary>' +
+'<div class="accbody"><div class="cols">' + innerColsHtml + "</div></div></details>"
+);
+}
+
+// Renders one column (stage) as its own nested accordion inside a row.
+// Collapsed by default; open/closed state persists per column (keyed by
+// colKey) across re-renders. The candidate list inside is further capped
+// at COL_PAGE_SIZE via colBodyHtml's own "Show more" toggle.
+function colHtml(label, cards, colKey) {
+var open = !!state.openCols[colKey];
+return (
+'<details class="col"' + (open ? " open" : "") + ' data-colkey="' + esc(colKey) + '">' +
+'<summary class="colhead"><span>' + esc(label) + '</span><span class="colheadright"><span class="colcount">' + cards.length + '</span><span class="colarrow">▸</span></span></summary>' +
+'<div class="accbody">' + colBodyHtml(cards, colKey) + "</div></details>"
+);
 }
 
 // Renders a column's candidate list, capped at COL_PAGE_SIZE with a
@@ -212,7 +230,7 @@ $("board").innerHTML = rowsHtml + rejectedHtml;
 // by colKey) across re-renders until the user collapses it again.
 function colBodyHtml(cards, colKey) {
 if (!cards.length) return '<p class="colempty">No candidates</p>';
-var expanded = !!state.expandedCols[colKey];
+var expanded = !!state.colShowAll[colKey];
 var visible = expanded ? cards : cards.slice(0, COL_PAGE_SIZE);
 var html = visible.map(cardHtml).join("");
 var remaining = cards.length - visible.length;
@@ -369,13 +387,25 @@ render();
 });
 $("board").addEventListener("click", function (e) {
 var more = e.target.closest("[data-colmore]");
-if (more) { state.expandedCols[more.getAttribute("data-colmore")] = true; renderBoard(); return; }
+if (more) { state.colShowAll[more.getAttribute("data-colmore")] = true; renderBoard(); return; }
 var less = e.target.closest("[data-colless]");
-if (less) { delete state.expandedCols[less.getAttribute("data-colless")]; renderBoard(); return; }
+if (less) { delete state.colShowAll[less.getAttribute("data-colless")]; renderBoard(); return; }
 var card = e.target.closest(".ccard");
 if (!card) return;
 openCandidate(card.getAttribute("data-id"));
 });
+// Rows and columns are native <details> elements; capture their toggle
+// events (capture phase so both nesting levels are caught reliably) and
+// persist the open/closed state so it survives the next renderBoard().
+$("board").addEventListener("toggle", function (e) {
+var el = e.target;
+if (!el || el.tagName !== "DETAILS") return;
+if (el.hasAttribute("data-rowkey")) {
+state.openRows[el.getAttribute("data-rowkey")] = el.open;
+} else if (el.hasAttribute("data-colkey")) {
+state.openCols[el.getAttribute("data-colkey")] = el.open;
+}
+}, true);
 $("addBtn").addEventListener("click", quickAdd);
 $("addName").addEventListener("keydown", function (e) { if (e.key === "Enter") quickAdd(); });
 
