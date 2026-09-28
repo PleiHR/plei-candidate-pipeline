@@ -1,6 +1,6 @@
 (function () {
 var db = null; // set once PLEI_DB exists
-var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false, openRows: {}, openCols: {}, colShowAll: {} };
+var state = { roles: [], candidates: [], comments: [], activeRole: null, openCandidateId: null, session: null, isAdmin: false, openRows: {}, openCols: {}, colShowAll: {}, archivedOpen: false };
 var COL_PAGE_SIZE = 6; // candidates shown per column before "Show more"
 
 function esc(s) {
@@ -113,8 +113,18 @@ state.candidates = await db.listCandidates();
 render();
 }
 
+function roleByTitle(title) {
+if (!title) return null;
+return state.roles.filter(function (r) { return r.title === title; })[0] || null;
+}
+
 function candidatesForActiveRole() {
-if (!state.activeRole) return state.candidates;
+if (!state.activeRole) {
+return state.candidates.filter(function (c) {
+var r = roleByTitle(c.role_title);
+return !r || r.status === "open";
+});
+}
 return state.candidates.filter(function (c) { return c.role_title === state.activeRole; });
 }
 
@@ -131,15 +141,89 @@ state.candidates.forEach(function (c) {
 if (!c.role_title) return;
 counts[c.role_title] = (counts[c.role_title] || 0) + 1;
 });
-var roleTitles = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+var openTitles = Object.keys(counts)
+.filter(function (t) {
+var r = roleByTitle(t);
+return !r || r.status === "open";
+})
+.sort(function (a, b) { return counts[b] - counts[a]; });
 var html = '<button data-role="" class="' + (!state.activeRole ? "active" : "") + '">All roles</button>';
-html += roleTitles
+html += openTitles
 .map(function (t) {
 return '<button data-role="' + esc(t) + '" class="' + (state.activeRole === t ? "active" : "") + '">' + esc(t) + " (" + counts[t] + ")</button>";
 })
 .join("");
 $("roleTabs").innerHTML = html;
+renderRoleControls();
+renderArchivedRoles();
 $("roleHint").textContent = state.activeRole ? "Showing only candidates applying for " + state.activeRole + "." : "";
+}
+
+function renderRoleControls() {
+var el = $("roleControls");
+if (!el) return;
+if (!state.activeRole) { el.innerHTML = ""; return; }
+var r = roleByTitle(state.activeRole);
+var status = r ? r.status : "open";
+var buttons = "";
+if (status === "open") {
+buttons =
+'<button class="linklike rolestatusbtn" type="button" data-setstatus="paused">Pause search</button>' +
+'<button class="linklike rolestatusbtn" type="button" data-setstatus="closed">Close search</button>';
+} else if (status === "paused") {
+buttons =
+'<button class="linklike rolestatusbtn" type="button" data-setstatus="open">Reopen</button>' +
+'<button class="linklike rolestatusbtn" type="button" data-setstatus="closed">Close search</button>';
+} else {
+buttons = '<button class="linklike rolestatusbtn" type="button" data-setstatus="open">Reopen</button>';
+}
+el.innerHTML = buttons;
+}
+
+function renderArchivedRoles() {
+var el = $("archivedRoles");
+if (!el) return;
+var counts = {};
+state.candidates.forEach(function (c) {
+if (!c.role_title) return;
+counts[c.role_title] = (counts[c.role_title] || 0) + 1;
+});
+var archived = state.roles.filter(function (r) { return r.status !== "open"; });
+if (!archived.length) { el.innerHTML = ""; return; }
+var open = !!state.archivedOpen;
+var rowsHtml = archived
+.sort(function (a, b) { return a.title.localeCompare(b.title); })
+.map(function (r) {
+var n = counts[r.title] || 0;
+return (
+'<button class="archivedrow" type="button" data-archived-role="' + esc(r.title) + '">' +
+'<span class="archtitle">' + esc(r.title) + "</span>" +
+'<span class="archstatus pill ' + (r.status === "closed" ? "closed" : "paused") + '">' + esc(r.status) + "</span>" +
+'<span class="archcount">' + n + (n === 1 ? " candidate" : " candidates") + "</span>" +
+"</button>"
+);
+})
+.join("");
+el.innerHTML =
+'<details class="archivedacc"' +
+(open ? " open" : "") +
+'><summary class="archivedhead"><span>Paused &amp; closed roles</span><span class="archcountbadge">' +
+archived.length +
+'</span></summary><div class="accbody">' +
+rowsHtml +
+"</div></details>";
+}
+
+async function setRoleStatus(title, status) {
+var r = roleByTitle(title);
+if (r) {
+await db.upsertRole({ id: r.id, title: r.title, status: status });
+r.status = status;
+} else {
+var rows = await db.upsertRole({ title: title, status: status });
+if (rows && rows[0]) state.roles.push(rows[0]);
+}
+render();
 }
 
 function renderStats() {
@@ -406,6 +490,30 @@ state.openRows[el.getAttribute("data-rowkey")] = el.open;
 state.openCols[el.getAttribute("data-colkey")] = el.open;
 }
 }, true);
+if ($("roleControls")) {
+$("roleControls").addEventListener("click", async function (e) {
+var btn = e.target.closest("button[data-setstatus]");
+if (!btn || !state.activeRole) return;
+var status = btn.getAttribute("data-setstatus");
+var title = state.activeRole;
+if (status !== "open") state.activeRole = null;
+await setRoleStatus(title, status);
+});
+}
+if ($("archivedRoles")) {
+$("archivedRoles").addEventListener("click", function (e) {
+var btn = e.target.closest("button[data-archived-role]");
+if (!btn) return;
+state.activeRole = btn.getAttribute("data-archived-role");
+render();
+});
+$("archivedRoles").addEventListener("toggle", function (e) {
+var el = e.target;
+if (el && el.tagName === "DETAILS" && el.classList.contains("archivedacc")) {
+state.archivedOpen = el.open;
+}
+}, true);
+}
 $("addBtn").addEventListener("click", quickAdd);
 $("addName").addEventListener("keydown", function (e) { if (e.key === "Enter") quickAdd(); });
 
