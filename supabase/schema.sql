@@ -14,9 +14,22 @@ title text not null unique,
 team text,
 location text,
 type text,
-status text not null default 'open' check (status in ('open','closed')),
+status text not null default 'open' check (status in ('open','paused','closed')),
 created_at timestamptz not null default now()
 );
+
+-- Widen the status check constraint for installations created before
+-- "paused" existed (safe to re-run: drops the old constraint if present,
+-- then adds the new one).
+do $$
+begin
+if exists (
+select 1 from pg_constraint where conname = 'roles_status_check'
+) then
+alter table roles drop constraint roles_status_check;
+end if;
+alter table roles add constraint roles_status_check check (status in ('open','paused','closed'));
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- candidates: one row per applicant, moving through the pipeline.
